@@ -11,9 +11,9 @@ from openai import OpenAI
 from langchain_openai import ChatOpenAI
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 
-from backend.tools import create_ticket, list_tickets
+from tools import create_ticket, list_tickets
 
 
 # Load environment variables from .env file
@@ -46,21 +46,23 @@ llm = ChatOpenAI(
   base_url="https://openrouter.ai/api/v1",
   api_key=SecretStr(OPENROUTER_API_KEY),
   model="moonshotai/kimi-k2:free",
-  temperature=0.7,
+  temperature=0.2,
   default_headers={
     "HTTP-Referer": "localhost:3000",
     "X-Title": "Customer Service AI",
-  }
+  },
+  max_retries=3,
 )
 
 system = """
-You are "NetBuddy", a friendly customer-service agent for an Internet Service Provider.
+You are "NetBuddy", a friendly customer-service agent for an Internet Service Provider. 
 
 Role & Tone  
 • Greet warmly, use the customer’s name if given, and show empathy.  
 • Keep replies short, clear, and jargon-free.
 
 Information Gathering  
+• Ask the customer for their name and account id or phone number at the start.
 • Ask for: account number, service type (fiber / cable / DSL), and a brief description of the issue.  
 • Guide the customer through one quick self-help step (restart modem, check cables, run built-in speed test).  
 
@@ -78,7 +80,7 @@ Ticket Creation
 • Title: concise issue summary.  
 • Description: account number, service type, issue details, attempted steps, sentiment, and customer quote.  
 • Priority: the computed level above.  
-• End every interaction with: “Ticket #{ID} created with **<priority>** priority.”
+• End every interaction with: “Ticket #<id> created with **<priority>** priority.”
 
 Tool Rules  
 • Use ONLY the provided tools to create or list tickets.  
@@ -92,8 +94,8 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 tools = [create_ticket, list_tickets]
-agent = create_openai_tools_agent(llm=llm, tools=tools, prompt=prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=3, )
 
 # endpoints
 class Ask(BaseModel):
