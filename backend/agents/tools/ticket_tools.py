@@ -1,8 +1,8 @@
 import os
-from dotenv import load_dotenv
-from sqlmodel import Session, select, create_engine
-from models import Ticket
 from typing import List, Dict
+from dotenv import load_dotenv
+from sqlmodel import Session, create_engine, select
+from models import Ticket
 from langchain_core.tools import tool, ToolException
 
 # Load environment variables from .env file

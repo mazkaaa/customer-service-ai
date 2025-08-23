@@ -8,12 +8,13 @@ from sqlmodel import SQLModel, create_engine
 from dotenv import load_dotenv
 
 from agent import (
-    create_session, get_active_session, complete_session,
+    create_session, complete_session,
     get_session_history, add_session_turn,
-    create_ticket, list_tickets,
     ChatOpenAI, AGENT_REGISTRY
 )
 from langchain_core.exceptions import OutputParserException
+
+from api.ticket_api import list_tickets
 
 
 # Load environment variables from .env file
@@ -134,7 +135,11 @@ async def get_session(session_id: str):
 
 @app.get("/tickets")
 async def get_tickets(status: str = "open"):
-    return list_tickets(status)
+    """
+    List tickets, optionally filtered by status.
+    """
+    tickets = list_tickets(status)
+    return {"tickets": tickets}
 
 @app.get("/health")
 async def health():

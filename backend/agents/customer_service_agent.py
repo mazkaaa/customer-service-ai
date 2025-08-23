@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from tools import create_ticket, list_tickets
+from agents.tools.ticket_tools import create_ticket, list_tickets
 
 system_prompt = """
 You are <random customer service internet provider name>, a friendly customer-service agent for an Internet Service Provider. 
