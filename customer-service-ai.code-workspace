@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "name": "Agentic AI Backend", "path": "./backend" },
+    { "name": "Admin Frontend", "path": "./frontend/admin" }
+  ],
+  "settings": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  }
+}
