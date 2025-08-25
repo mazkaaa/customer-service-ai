@@ -17,19 +17,26 @@ if not REDIS_URL:
 
 r: Redis = redis.from_url(REDIS_URL, decode_responses=True)
 
+
 # Session-based chat functions
-def create_session(customer_id: str) -> str:
-    """Create a new chat session for a customer."""
+def create_session(customer_id: Optional[str]) -> str:
+    """Create a new chat session for a customer. customer_id can be None until provided."""
     session_id = str(uuid.uuid4())
     session_data = {
-        "customer_id": customer_id,
+        "customer_id": customer_id if customer_id is not None else "",
         "status": "active",
         "created_at": datetime.utcnow().isoformat()
     }
     r.hset(f"session:{session_id}", mapping=session_data)
     r.expire(f"session:{session_id}", 1800)  # 30 min TTL for active session
-    r.lpush(f"customer_sessions:{customer_id}", session_id)
+    if customer_id:
+        r.lpush(f"customer_sessions:{customer_id}", session_id)
     return session_id
+
+def update_session_customer_id(session_id: str, customer_id: str):
+    """Update the customer_id for a session and add to customer_sessions index."""
+    r.hset(f"session:{session_id}", "customer_id", customer_id)
+    r.lpush(f"customer_sessions:{customer_id}", session_id)
 
 def get_active_session(customer_id: str) -> Optional[str]:
     """Get the most recent active session for a customer."""
@@ -40,7 +47,7 @@ def get_active_session(customer_id: str) -> Optional[str]:
             return session_id
     return None
 
-def complete_session(session_id: str, ticket_id: Optional[int] = None):
+def complete_session(session_id: str, ticket_id: Optional[str] = None):
     """Mark a session as completed."""
     updates = {"status": "completed", "completed_at": datetime.utcnow().isoformat()}
     if ticket_id:

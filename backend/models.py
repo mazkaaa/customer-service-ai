@@ -1,10 +1,11 @@
 from uuid import UUID
+from uuid import uuid4
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
 
 class Ticket(SQLModel, table=True):
-    id: UUID = Field(default=None, primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     customer_id: str = Field(index=True) # phone/email/uuid
     title: str
     description: str
