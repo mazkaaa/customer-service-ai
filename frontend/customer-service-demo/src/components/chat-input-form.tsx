@@ -1,4 +1,4 @@
-import { Send } from "lucide-react";
+import { MessageCircleQuestion, Send } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -7,11 +7,12 @@ interface ChatInputFormProps {
   onSubmit: (message: string) => void;
   isLoading: boolean;
   isEmpty: boolean;
+  isCompleted: boolean;
 }
 const ChatInputForm = (props: ChatInputFormProps) => {
   const [message, setMessage] = useState("");
 
-  if (props.isEmpty) {
+  if (props.isEmpty || props.isCompleted) {
     return (
       <div className="w-full">
         <Button
@@ -19,7 +20,8 @@ const ChatInputForm = (props: ChatInputFormProps) => {
           className="w-full"
           onClick={() => props.onSubmit("Hello customer service")}
         >
-          Start conversation
+          Ask a question
+          <MessageCircleQuestion />
         </Button>
       </div>
     );

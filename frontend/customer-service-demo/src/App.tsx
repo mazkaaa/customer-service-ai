@@ -33,16 +33,20 @@ interface IContinueChatResponse {
 }
 
 interface IErrorResponse {
-  message: string;
-  output: string;
-  session_id: string;
-  session_completed: boolean;
+  detail: {
+    message: string;
+    output: string;
+    session_id: string;
+    session_completed: boolean;
+  };
 }
 
 function App() {
+  const [startConversation, setStartConversation] = useState(false);
   const [conversations, setConversations] = useState<IConversation[]>([]);
 
   const chatBoxRef = useRef<HTMLDivElement>(null);
+  const [showTypingPlaceholder, setShowTypingPlaceholder] = useState(false);
 
   const addMessageToConversation = useCallback((message: IConversation) => {
     setConversations((prev) => [...prev, message]);
@@ -72,6 +76,17 @@ function App() {
         session_completed: false,
       });
     },
+    onError: (error: IErrorResponse) => {
+      addMessageToConversation({
+        id: crypto.randomUUID(),
+        from: "assistant",
+        output: error.detail.output,
+        session_completed: error.detail.session_completed,
+      });
+    },
+    onSettled: () => {
+      setShowTypingPlaceholder(false);
+    },
   });
 
   const continueChatMutation = useMutation({
@@ -100,30 +115,65 @@ function App() {
         session_completed: data.session_completed,
       });
     },
+    onError: (error: IErrorResponse) => {
+      addMessageToConversation({
+        id: crypto.randomUUID(),
+        from: "assistant",
+        output: error.detail.output,
+        session_completed: error.detail.session_completed,
+      });
+    },
+    onSettled: () => {
+      setShowTypingPlaceholder(false);
+    },
   });
 
   useEffect(() => {
-    if (conversations.length > 0) {
+    if (conversations.length > 0 || showTypingPlaceholder) {
       chatBoxRef.current?.scrollTo({
         top: chatBoxRef.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  }, [conversations]);
+  }, [conversations, showTypingPlaceholder]);
+
+  // make placeholderTypingRef show when mutation is loading (after some delay)
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (startChatMutation.isPending || continueChatMutation.isPending) {
+      timeout = setTimeout(() => {
+        setShowTypingPlaceholder(true);
+      }, 500); // show after 500ms
+    }
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [startChatMutation.isPending, continueChatMutation.isPending]);
 
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center">
-      <Card className="w-md">
+      <Card
+        className={cn("w-sm", {
+          "gap-2": !startConversation,
+          "gap-6": startConversation,
+        })}
+      >
         <CardHeader>
           <CardTitle>Customer Support AI</CardTitle>
           <CardDescription>
             Ask any questions you have about our product
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="transition-all">
           <div
             ref={chatBoxRef}
-            className="flex flex-col gap-4 h-96 overflow-y-auto"
+            className={cn(
+              "flex flex-col gap-4 overflow-y-auto overflow-hidden transition-all duration-500 [&>div>ol]:list-decimal [&>div>ol]:pl-6 [&>ul]:list-disc [&>ul]:pl-6 [&>li]:mt-1",
+              {
+                "h-96": startConversation,
+                "h-0": !startConversation,
+              }
+            )}
           >
             {conversations.map((item) => (
               <div
@@ -138,7 +188,8 @@ function App() {
                 <Markdown>{item.output}</Markdown>
               </div>
             ))}
-            {startChatMutation.isPending || continueChatMutation.isPending ? (
+            {(startChatMutation.isPending || continueChatMutation.isPending) &&
+            showTypingPlaceholder ? (
               <div className="flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm bg-muted">
                 <span className="italic text-muted-foreground">
                   Customer Support AI is typing...
@@ -149,6 +200,10 @@ function App() {
         </CardContent>
         <CardFooter>
           <ChatInputForm
+            isCompleted={
+              conversations.length > 0 &&
+              conversations[conversations.length - 1].session_completed
+            }
             isEmpty={conversations.length === 0}
             isLoading={
               startChatMutation.isPending || continueChatMutation.isPending
@@ -161,17 +216,16 @@ function App() {
                 session_completed: false,
               });
 
-              if (conversations.length === 0) {
+              if (conversations.length === 0 && !startConversation) {
+                setStartConversation(true);
                 startChatMutation.mutate({
                   question: message,
                 });
-              } else {
-                if (startChatMutation.isSuccess) {
-                  continueChatMutation.mutate({
-                    question: message,
-                    session_id: startChatMutation.data.session_id,
-                  });
-                }
+              } else if (startChatMutation.isSuccess) {
+                continueChatMutation.mutate({
+                  question: message,
+                  session_id: startChatMutation.data.session_id,
+                });
               }
             }}
           />
