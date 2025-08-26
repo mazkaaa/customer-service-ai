@@ -33,11 +33,6 @@ def create_session(customer_id: Optional[str]) -> str:
         r.lpush(f"customer_sessions:{customer_id}", session_id)
     return session_id
 
-def update_session_customer_id(session_id: str, customer_id: str):
-    """Update the customer_id for a session and add to customer_sessions index."""
-    r.hset(f"session:{session_id}", "customer_id", customer_id)
-    r.lpush(f"customer_sessions:{customer_id}", session_id)
-
 def get_active_session(customer_id: str) -> Optional[str]:
     """Get the most recent active session for a customer."""
     sessions = cast(List[str], r.lrange(f"customer_sessions:{customer_id}", 0, -1))
@@ -63,6 +58,11 @@ def get_session_history(session_id: str) -> List[Dict]:
     if not data:
         return []
     return [json.loads(m) for m in reversed(data)]
+
+def is_session_completed(session_id: str) -> bool:
+    """Check if a session is completed."""
+    session_data = cast(Dict[str, str], r.hgetall(f"session:{session_id}"))
+    return session_data.get("status") == "completed" if session_data else False
 
 def add_session_turn(session_id: str, role: str, content: str):
     """Add a message to a session."""

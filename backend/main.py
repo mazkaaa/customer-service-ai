@@ -13,10 +13,10 @@ from agent import (
     get_session_history, add_session_turn,
     ChatOpenAI, AGENT_REGISTRY
 )
-from chat import update_session_customer_id
 from langchain_core.exceptions import OutputParserException
 
 from api.ticket_api import list_tickets
+from chat import is_session_completed
 
 
 # Load environment variables from .env file
@@ -24,6 +24,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME", "moonshotai/kimi-k2:free")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
@@ -50,7 +51,7 @@ app.add_middleware(
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=SecretStr(OPENROUTER_API_KEY),
-    model="moonshotai/kimi-k2:free",
+    model=MODEL_NAME,
     temperature=0.2,
     default_headers={
         "HTTP-Referer": "localhost:3000",
@@ -108,6 +109,18 @@ async def chat(payload: SessionAsk):
     """Continue chat in a session."""
     history = get_session_history(payload.session_id)
 
+    # check if session is already completed, if so, return error
+    if is_session_completed(payload.session_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "output": "This session has already been completed. Please start a new session for further assistance.",
+                "session_id": payload.session_id,
+                "session_completed": True,
+                "message": "Session already completed."
+            }
+        )
+
     try:
         response = agent_executor.invoke({
             "input": payload.question,
@@ -118,8 +131,8 @@ async def chat(payload: SessionAsk):
         add_session_turn(payload.session_id, "user", payload.question)
         add_session_turn(payload.session_id, "assistant", response["output"])
 
-        if "Ticket #" in response["output"]:
-            ticket_match = re.search(r"Ticket #([\w-]+)", response["output"])
+        if "Ticket #" or "ticket #" in response["output"]:
+            ticket_match = re.search(r"ticket #([\w-]+)", response["output"], re.IGNORECASE)
             if ticket_match:
                 ticket_id = ticket_match.group(1)
                 complete_session(payload.session_id, ticket_id)
