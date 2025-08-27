@@ -2,7 +2,10 @@
   "folders": [
     { "name": "Agentic AI Backend", "path": "./backend" },
     { "name": "Admin Frontend", "path": "./frontend/admin" },
-    { "name": "Customer Service Demo Frontend", "path": "./frontend/customer-service-demo" }
+    {
+      "name": "Customer Service Demo Frontend",
+      "path": "./frontend/customer-service-demo"
+    }
   ],
   "settings": {
     "editor.defaultFormatter": "biomejs.biome",
