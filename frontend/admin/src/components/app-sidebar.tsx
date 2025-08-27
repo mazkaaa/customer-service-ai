@@ -6,8 +6,6 @@ import {
 	ChartBar,
 	Database,
 	File,
-	Files,
-	FilesIcon,
 	HelpCircle,
 	LayoutDashboard,
 	Search,
