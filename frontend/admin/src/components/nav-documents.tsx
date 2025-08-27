@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Ellipsis, Folder, Share, Trash } from "lucide-react";
 import type { JSX } from "react";
 import {
@@ -30,6 +30,7 @@ export function NavDocuments({
 	}[];
 }) {
 	const { isMobile } = useSidebar();
+	const { pathname } = useLocation();
 
 	return (
 		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -37,7 +38,7 @@ export function NavDocuments({
 			<SidebarMenu>
 				{items.map((item) => (
 					<SidebarMenuItem key={item.name}>
-						<SidebarMenuButton asChild>
+						<SidebarMenuButton asChild isActive={pathname === item.url}>
 							<Link to={item.url}>
 								{item.icon}
 								<span>{item.name}</span>

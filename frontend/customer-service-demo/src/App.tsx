@@ -168,7 +168,7 @@ function App() {
           <div
             ref={chatBoxRef}
             className={cn(
-              "flex flex-col gap-4 overflow-y-auto overflow-hidden transition-all duration-500 [&>div>ol]:list-decimal [&>div>ol]:pl-6 [&>ul]:list-disc [&>ul]:pl-6 [&>li]:mt-1",
+              "flex flex-col gap-4 overflow-y-auto transition-all duration-500 [&>div>ol]:list-decimal [&>div>ol]:pl-6 [&>ul]:list-disc [&>ul]:pl-6 [&>li]:mt-1",
               {
                 "h-96": startConversation,
                 "h-0": !startConversation,
@@ -216,7 +216,11 @@ function App() {
                 session_completed: false,
               });
 
-              if (conversations.length === 0 && !startConversation) {
+              if (
+                (conversations.length === 0 && !startConversation) ||
+                (conversations.length > 0 &&
+                  conversations[conversations.length - 1].session_completed)
+              ) {
                 setStartConversation(true);
                 startChatMutation.mutate({
                   question: message,
