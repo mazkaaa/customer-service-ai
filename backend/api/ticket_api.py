@@ -20,7 +20,7 @@ def list_tickets(status: str = "open") -> List[Dict]:
         stmt = select(Ticket).where(Ticket.status == status.lower())
         rows = session.exec(stmt).all()
         return [
-            {"id": t.id, "customer_id": t.customer_id ,"title": t.title, "description": t.description,
+            {"id": t.id, "customer_id": t.customer_id, "ticket_number": t.ticket_number, "title": t.title, "description": t.description,
              "priority": t.priority, "status": t.status, "created_at": t.created_at}
             for t in rows
         ]

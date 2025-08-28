@@ -18,6 +18,7 @@ interface ITicketResponse {
 	priority: string;
 	status: string;
 	created_at: string;
+	ticket_number: number;
 }
 
 function RouteComponent() {
@@ -39,7 +40,7 @@ function RouteComponent() {
 
 	const defineContent = useMemo(() => {
 		if (isLoading) {
-			return <div>Loading tickets...</div>;
+			return <div className="p-6">Loading tickets...</div>;
 		}
 		if (isSuccess && data && data.length > 0) {
 			return data
@@ -96,6 +97,9 @@ function RouteComponent() {
 										</h2>
 										<p className="text-sm text-muted-foreground">
 											Customer ID: {selectedTicket.customer_id}
+										</p>
+										<p className="text-sm text-muted-foreground">
+											Ticket Number: #{selectedTicket.ticket_number}
 										</p>
 										<p className="text-sm text-muted-foreground">
 											Priority: {selectedTicket.priority}
