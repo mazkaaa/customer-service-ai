@@ -3,7 +3,7 @@ from typing import List, Dict
 from dotenv import load_dotenv
 from redis import Redis
 import redis
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, create_engine, desc, select
 from models import Ticket
 from langchain_core.tools import tool, ToolException
 
@@ -28,7 +28,7 @@ r: Redis = redis.from_url(REDIS_URL, decode_responses=True)
         "MUST be used to create a new support ticket for a customer. "
         "Do NOT fabricate ticket creation—always call this tool to create a ticket. "
         "Requires: title (concise summary), description (detailed issue), customer_id (identifier), and priority (low, medium, high). "
-        "Returns the ticket number and priority."
+        "Returns the ticket_number and priority."
     ),
     args_schema={
         "title": "A concise 5-8 word summary of the issue (required)",
@@ -41,10 +41,20 @@ r: Redis = redis.from_url(REDIS_URL, decode_responses=True)
 def create_ticket(title: str, description: str, customer_id: str, priority: str = "medium") -> str:
     try:
         with Session(engine) as session:
-            ticket = Ticket(title=title, description=description, customer_id=customer_id, priority=priority.lower())
+            max_ticket_number = session.exec(
+                select(Ticket.ticket_number).order_by(desc(Ticket.ticket_number))
+            ).first()
+            next_ticket_number = (max_ticket_number or 0) + 1
+            ticket = Ticket(
+                title=title,
+                description=description,
+                customer_id=customer_id,
+                priority=priority.lower(),
+                ticket_number=next_ticket_number
+            )
             session.add(ticket)
             session.commit()
-            return f"Ticket #{ticket.id} created with priority {priority}."
+            return f"Ticket #{ticket.ticket_number} created with priority {priority}."
     except Exception as e:
         raise ToolException(f"DB error: {str(e)}")
 
@@ -65,7 +75,7 @@ def list_tickets(status: str = "open") -> List[Dict]:
         stmt = select(Ticket).where(Ticket.status == status.lower())
         rows = session.exec(stmt).all()
         return [
-            {"id": t.id, "title": t.title, "description": t.description,
+            {"id": t.id, "title": t.title, "ticket_number": t.ticket_number, "description": t.description,
              "priority": t.priority, "status": t.status, "created_at": t.created_at}
             for t in rows
         ]
