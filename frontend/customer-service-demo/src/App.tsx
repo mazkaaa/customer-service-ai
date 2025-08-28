@@ -168,7 +168,7 @@ function App() {
           <div
             ref={chatBoxRef}
             className={cn(
-              "flex flex-col gap-4 overflow-y-auto transition-all duration-500 [&>div>ol]:list-decimal [&>div>ol]:pl-6 [&>ul]:list-disc [&>ul]:pl-6 [&>li]:mt-1",
+              "flex flex-col gap-4 overflow-y-auto transition-all duration-500 [&>div>ol]:list-decimal [&>div>ol]:pl-6 [&>div>ul]:list-disc [&>div>ul]:pl-6 [&>div>li]:mt-1",
               {
                 "h-96": startConversation,
                 "h-0": !startConversation,

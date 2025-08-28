@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -37,50 +37,51 @@ function RouteComponent() {
 		null,
 	);
 
+	const defineContent = useMemo(() => {
+		if (isLoading) {
+			return <div>Loading tickets...</div>;
+		}
+		if (isSuccess && data && data.length > 0) {
+			return data
+				.sort((a, b) => {
+					return (
+						new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+					);
+				})
+				.map((ticket) => (
+					<button
+						type="button"
+						onClick={() => setSelectedTicket(ticket)}
+						key={ticket.id}
+						className={cn(
+							"px-6 py-4 hover:bg-accent text-start cursor-pointer flex justify-between items-center space-x-2",
+							{
+								"rounded-t-xl": ticket === data[0],
+								"rounded-b-xl": ticket === data[data.length - 1],
+								"bg-accent": selectedTicket?.id === ticket.id,
+							},
+						)}
+					>
+						<section className="flex flex-col min-w-0">
+							<div className="text-sm">{ticket.customer_id}</div>
+							<h2 className="text-sm font-semibold truncate">{ticket.title}</h2>
+						</section>
+						<div>
+							<ChevronRight className="h-4 w-4 text-muted-foreground" />
+						</div>
+					</button>
+				));
+		}
+		return <div className="p-6">No tickets available.</div>;
+	}, [data, isLoading, isSuccess, selectedTicket]);
+
 	return (
 		<main className="flex flex-1 flex-col py-4 md:py-6 px-4 lg:px-6 @container/main">
 			<div className="flex gap-6">
 				<section className="w-full max-w-xs">
 					<Card className="py-0 gap-6">
 						<CardContent className="px-0">
-							<div className="flex flex-col divide-y">
-								{isSuccess && !isLoading ? (
-									data
-										.sort((a, b) => {
-											return (
-												new Date(b.created_at).getTime() -
-												new Date(a.created_at).getTime()
-											);
-										})
-										.map((ticket) => (
-											<button
-												type="button"
-												onClick={() => setSelectedTicket(ticket)}
-												key={ticket.id}
-												className={cn(
-													"px-6 py-4 hover:bg-accent text-start cursor-pointer flex justify-between items-center space-x-2",
-													{
-														"rounded-t-xl": ticket === data[0],
-														"rounded-b-xl": ticket === data[data.length - 1],
-														"bg-accent": selectedTicket?.id === ticket.id,
-													},
-												)}
-											>
-												<section className="flex flex-col min-w-0">
-													<div className="text-sm">{ticket.customer_id}</div>
-													<h2 className="text-sm font-semibold truncate">
-														{ticket.title}
-													</h2>
-												</section>
-												<div>
-													<ChevronRight className="h-4 w-4 text-muted-foreground" />
-												</div>
-											</button>
-										))
-								) : (
-									<div className="p-6">Loading tickets...</div>
-								)}
-							</div>
+							<div className="flex flex-col divide-y">{defineContent}</div>
 						</CardContent>
 					</Card>
 				</section>
