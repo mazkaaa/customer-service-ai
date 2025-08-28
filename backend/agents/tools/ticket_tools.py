@@ -22,12 +22,22 @@ if not REDIS_URL:
 
 r: Redis = redis.from_url(REDIS_URL, decode_responses=True)
 
-@tool(name_or_callable="create_ticket", description="Create a new support ticket for a customer with title, description, customer_id, and priority", args_schema={
-    "title": "The title of the ticket",
-    "description": "A detailed description of the issue",
-    "customer_id": "The customer's phone number, email, or UUID",
-    "priority": "The priority of the ticket (low, medium, high)"
-}, return_direct=False)
+@tool(
+    name_or_callable="create_ticket",
+    description=(
+        "MUST be used to create a new support ticket for a customer. "
+        "Do NOT fabricate ticket creation—always call this tool to create a ticket. "
+        "Requires: title (concise summary), description (detailed issue), customer_id (identifier), and priority (low, medium, high). "
+        "Returns the ticket number and priority."
+    ),
+    args_schema={
+        "title": "A concise 5-8 word summary of the issue (required)",
+        "description": "A short paragraph explaining the problem and any details the customer gave (required)",
+        "customer_id": "The customer's phone number, email, or UUID (required)",
+        "priority": "The priority of the ticket (low, medium, high). Use the logic in the system prompt."
+    },
+    return_direct=False
+)
 def create_ticket(title: str, description: str, customer_id: str, priority: str = "medium") -> str:
     try:
         with Session(engine) as session:
@@ -38,8 +48,18 @@ def create_ticket(title: str, description: str, customer_id: str, priority: str 
     except Exception as e:
         raise ToolException(f"DB error: {str(e)}")
 
-@tool(name_or_callable="list_tickets", description="List all tickets with a specific status.", args_schema={
-    "status": "The status of the tickets to list (open, closed, escalated)"}, return_direct=True)
+@tool(
+    name_or_callable="list_tickets",
+    description=(
+        "MUST be used to retrieve a list of all tickets with a specific status (open, closed, escalated). "
+        "Do NOT fabricate ticket lists—always call this tool to get ticket data. "
+        "Returns a list of ticket details."
+    ),
+    args_schema={
+        "status": "The status of the tickets to list (open, closed, escalated)"
+    },
+    return_direct=True,
+)
 def list_tickets(status: str = "open") -> List[Dict]:
     with Session(engine) as session:
         stmt = select(Ticket).where(Ticket.status == status.lower())
@@ -50,10 +70,19 @@ def list_tickets(status: str = "open") -> List[Dict]:
             for t in rows
         ]
 
-@tool(name_or_callable="update_session_customer_id", description="Update the customer_id if its provided by the user on the current session_id", args_schema={
-    "session_id": "The session ID to update",
-    "customer_id": "The customer ID to set"
-}, return_direct=False)
+@tool(
+    name_or_callable="update_session_customer_id",
+    description=(
+        "MUST be used to update the customer_id for the current session when the customer provides their ID. "
+        "Do NOT assume the session is updated—always call this tool to set the customer_id for the session. "
+        "This ensures the session is linked to the correct customer."
+    ),
+    args_schema={
+        "session_id": "The session ID to update (required)",
+        "customer_id": "The customer ID to set (required)"
+    },
+    return_direct=False
+)
 def update_session_customer_id(session_id: str, customer_id: str):
     """Update the customer_id for a session and add to customer_sessions index."""
     r.hset(f"session:{session_id}", "customer_id", customer_id)
