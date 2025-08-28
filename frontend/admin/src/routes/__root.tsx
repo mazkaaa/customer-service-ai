@@ -28,18 +28,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					<Outlet />
 				</SidebarInset>
 			</SidebarProvider>
-			<TanstackDevtools
-				config={{
-					position: "bottom-left",
-				}}
-				plugins={[
-					{
-						name: "Tanstack Router",
-						render: <TanStackRouterDevtoolsPanel />,
-					},
-					TanStackQueryDevtools,
-				]}
-			/>
+			{import.meta.env.DEV && (
+				<TanstackDevtools
+					config={{
+						position: "bottom-left",
+					}}
+					plugins={[
+						{
+							name: "Tanstack Router",
+							render: <TanStackRouterDevtoolsPanel />,
+						},
+						TanStackQueryDevtools,
+					]}
+				/>
+			)}
 		</>
 	),
 });

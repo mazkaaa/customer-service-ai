@@ -1,11 +1,29 @@
-# syntax=docker/dockerfile:1
+# ── Stage 1: build the app ---------------------------------
 FROM node:20-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN npm install --legacy-peer-deps && npm run build
 
-FROM nginx:alpine
+ARG NODE_ENV=production
+ENV NODE_ENV=$NODE_ENV
+
+WORKDIR /app
+
+# 1. Copy package files
+COPY package.json package-lock.json ./
+
+# 2. Install exact versions (ci == clean install)
+RUN npm ci --omit=dev
+
+# 3. Copy source & build
+COPY . .
+RUN npm run build
+
+# ── Stage 2: serve with nginx ------------------------------
+FROM nginx:stable-alpine AS runtime
+
+# 4. Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+
+# 5. Optional SPA fallback
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
