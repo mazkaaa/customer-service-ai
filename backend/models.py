@@ -5,8 +5,11 @@ from typing import Optional
 from datetime import datetime
 
 class Ticket(SQLModel, table=True):
+    """
+    Ticket model for customer support tickets.
+    """
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    ticket_number: Optional[int] = Field(default=None, index=True, unique=True)
+    ticket_number: Optional[int] = Field(default=None, index=True, unique=True, )
     customer_id: str = Field(index=True) # phone/email/uuid
     title: str
     description: str
