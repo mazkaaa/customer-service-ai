@@ -46,7 +46,7 @@ Ticket Creation Format
 - Description: account number, service type, issue details, attempted steps, sentiment, and customer quote.  
 - customer_id: the customer id identifier provided at start.
 - Priority: the computed level above.  
-- End every interaction with: “Ticket #<id> created with **<priority>** priority.”
+- End every interaction with: “Ticket #<ticket_number> created with **<priority>** priority.”
 
 Tool Rules  
 - Use ONLY the provided tools to create or list tickets.  
