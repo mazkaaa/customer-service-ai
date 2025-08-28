@@ -131,8 +131,9 @@ async def chat(payload: SessionAsk):
         add_session_turn(payload.session_id, "user", payload.question)
         add_session_turn(payload.session_id, "assistant", response["output"])
 
-        if "Ticket #" or "ticket #" in response["output"]:
-            ticket_match = re.search(r"ticket #([\w-]+)", response["output"], re.IGNORECASE)
+        # TODO: Check if ticket was created using redis session check (add ticket_id to session on creation)
+        if "#" in response["output"]:
+            ticket_match = re.search(r"#([\w-]+)", response["output"], re.IGNORECASE)
             if ticket_match:
                 ticket_id = ticket_match.group(1)
                 complete_session(payload.session_id, ticket_id)
