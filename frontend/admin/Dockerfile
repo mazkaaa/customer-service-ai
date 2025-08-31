@@ -1,5 +1,5 @@
 # ── Stage 1: build the app ---------------------------------
-FROM node:20-alpine AS builder
+FROM node:22 AS builder
 
 ARG NODE_ENV=production
 ENV NODE_ENV=$NODE_ENV
@@ -9,7 +9,7 @@ WORKDIR /app
 # 1. Copy package files
 COPY package.json package-lock.json ./
 
-# 2. Install exact versions (ci == clean install)
+# 2. Clean install dependencies
 RUN npm ci --omit=dev
 
 # 3. Copy source & build

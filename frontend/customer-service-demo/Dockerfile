@@ -1,5 +1,5 @@
 # ── Stage 1: build the app ---------------------------------
-FROM node:20-alpine AS builder
+FROM node:22 AS builder
 
 ARG NODE_ENV=production
 ENV NODE_ENV=$NODE_ENV
