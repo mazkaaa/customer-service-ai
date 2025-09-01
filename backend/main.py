@@ -1,9 +1,13 @@
 import os
 import re
+import shutil
 from typing import Union
+import uuid
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, SecretStr
 from sqlmodel import SQLModel, create_engine
 from dotenv import load_dotenv
@@ -14,6 +18,9 @@ from agent import (
     ChatOpenAI, AGENT_REGISTRY
 )
 from langchain_core.exceptions import OutputParserException
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_chroma import Chroma
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 
 from api.ticket_api import list_tickets
 from chat import is_session_completed
@@ -25,11 +32,18 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "moonshotai/kimi-k2:free")
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "nvidia/nv-embedqa-mistral-7b-v2")
+EMBEDDING_URL = os.getenv("EMBEDDING_URL")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 if not OPENROUTER_API_KEY:
     raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+if not EMBEDDING_API_KEY:
+    raise ValueError("EMBEDDING_API_KEY environment variable is not set")
+if not EMBEDDING_URL:
+    raise ValueError("EMBEDDING_URL environment variable is not set")
 
 engine = create_engine(DATABASE_URL, echo=False)
 SQLModel.metadata.create_all(engine)
@@ -63,6 +77,18 @@ llm = ChatOpenAI(
 )
 agent_executor = AGENT_REGISTRY["customer_service"](llm)
 
+embedding_model = NVIDIAEmbeddings(
+    model=EMBEDDING_MODEL_NAME,
+    api_key=SecretStr(EMBEDDING_API_KEY),
+    truncate="NONE",
+)
+
+vectorstore = Chroma(
+    collection_name="customer_service_knowledge",
+    embedding_function=embedding_model,
+    persist_directory="./chroma_db",
+)
+
 # Only require question at start; customer_id will be asked by AI
 class Ask(BaseModel):
     question: str
@@ -71,7 +97,15 @@ class SessionAsk(BaseModel):
     question: str
     session_id: str
 
-
+@app.on_event("startup")
+def startup_event():
+    """Load existing vectorstore on startup."""
+    vectorstore = Chroma(
+        collection_name="customer_service_knowledge",
+        embedding_function=embedding_model,
+        persist_directory="./chroma_db",
+    )
+    print("Vectorstore loaded.")
 
 @app.post("/start")
 async def start(payload: Ask):
@@ -182,6 +216,128 @@ async def get_tickets(status: str = "open"):
 async def health():
     return {"status": "ok"}
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, f"")
+@app.post(
+        path="/knowledge",
+        tags=["Knowledge Management"]
+)
+async def upload_knowledge_file(file: UploadFile = File(...)):
+    """Upload raw file for knowledge base usages without processing and storing in vector DB."""
+    try:
+        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        file.file.close()
+        return {
+            "filename": file.filename,
+            "message": "File uploaded successfully."
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Failed to upload the file. Error: {str(e)}"
+            }
+        )
+
+@app.put(
+        path="/knowledge",
+        tags=["Knowledge Management"]
+)
+async def process_knowledge_by_name(file_name: str):
+    """Process an uploaded file by filename and add to vector DB."""
+    file_path = os.path.join(UPLOAD_DIR, file_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "File not found."}
+        )
+    
+    try:
+        loader = PyPDFLoader(file_path)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+        )
+        docs = loader.load()
+        all_splits = text_splitter.split_documents(docs)
+
+        vectorstore.add_documents(all_splits)
+
+        return {
+            "filename": file_name,
+            "chunks_added": len(all_splits),
+            "message": "File processed and added to knowledge base."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Failed to process the file. Error: {str(e)}"
+            }
+        )
+
+@app.get(
+        path="/knowledge",
+        tags=["Knowledge Management"]
+)
+async def get_knowledge_list_files():
+    """List all uploaded files in the knowledge base. Return filename, extension, is processed, upload date, size, and number of chunks if its processed."""
+    try:
+        files = []
+        for filename in os.listdir(UPLOAD_DIR):
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            if os.path.isfile(file_path):
+                size = os.path.getsize(file_path)
+                is_processed = len(vectorstore.similarity_search(filename, k=1)) > 0
+                files.append({
+                    "filename": filename,
+                    "extension": os.path.splitext(filename)[1],
+                    "is_processed": is_processed,
+                    "upload_date": os.path.getctime(file_path),
+                    "size_bytes": size,
+                    "chunks_in_vector_db": len(vectorstore.similarity_search(filename, k=1000)) if is_processed else 0
+                })
+        return {"files": files}
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Uploads directory not found."
+            }
+        )
+
+@app.delete(
+        path="/knowledge/{file_name}",
+        tags=["Knowledge Management"],
+)
+async def delete_knowledge_file(file_name: str):
+    """Delete an uploaded knowledge file by filename including its chunks in vector DB and the original file."""
+    file_path = os.path.join(UPLOAD_DIR, file_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "File not found."}
+        )
+    
+    try:
+        # Remove from vectorstore
+        vectorstore.delete(
+            ids=[file_name],
+        )
+        
+        # Remove the original file
+        os.remove(file_path)
+
+        return {
+            "filename": file_name,
+            "message": "File and its knowledge chunks deleted successfully."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Failed to delete the file. Error: {str(e)}"
+            }
+        )
