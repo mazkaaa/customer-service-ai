@@ -3,7 +3,7 @@ import re
 from typing import Union
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, SecretStr
 from sqlmodel import SQLModel, create_engine
 from dotenv import load_dotenv
@@ -46,6 +46,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Instantiate the customer service agent from the registry
 llm = ChatOpenAI(
@@ -179,3 +181,7 @@ async def get_tickets(status: str = "open"):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, f"")
