@@ -129,7 +129,7 @@ const data = {
 		},
 		{
 			name: "Knowledge Library",
-			url: "#",
+			url: "/knowledge",
 			icon: <Database />,
 		},
 	],
