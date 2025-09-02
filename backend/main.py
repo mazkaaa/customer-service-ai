@@ -97,6 +97,9 @@ class SessionAsk(BaseModel):
     question: str
     session_id: str
 
+class ProcessKnowledgeFile(BaseModel):
+    file_name: str
+
 @app.on_event("startup")
 def startup_event():
     """Load existing vectorstore on startup."""
@@ -105,7 +108,7 @@ def startup_event():
         embedding_function=embedding_model,
         persist_directory="./chroma_db",
     )
-    print("Vectorstore loaded.")
+    print("Vectorstore loaded with existing data.")
 
 @app.post("/start")
 async def start(payload: Ask):
@@ -245,9 +248,11 @@ async def upload_knowledge_file(file: UploadFile = File(...)):
         path="/knowledge",
         tags=["Knowledge Management"]
 )
-async def process_knowledge_by_name(file_name: str):
+async def process_knowledge_by_name(
+    payload: ProcessKnowledgeFile
+):
     """Process an uploaded file by filename and add to vector DB."""
-    file_path = os.path.join(UPLOAD_DIR, file_name)
+    file_path = os.path.join(UPLOAD_DIR, payload.file_name)
     if not os.path.exists(file_path):
         raise HTTPException(
             status_code=404,
@@ -266,7 +271,7 @@ async def process_knowledge_by_name(file_name: str):
         vectorstore.add_documents(all_splits)
 
         return {
-            "filename": file_name,
+            "filename": payload.file_name,
             "chunks_added": len(all_splits),
             "message": "File processed and added to knowledge base."
         }

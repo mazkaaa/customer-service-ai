@@ -5,6 +5,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 
 interface MyRouterContext {
@@ -26,6 +27,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<SidebarInset>
 					<SiteHeader />
 					<Outlet />
+					<Toaster position="top-center" />
 				</SidebarInset>
 			</SidebarProvider>
 			{import.meta.env.DEV && (
