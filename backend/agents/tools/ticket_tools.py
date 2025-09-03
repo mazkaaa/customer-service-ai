@@ -34,11 +34,12 @@ r: Redis = redis.from_url(REDIS_URL, decode_responses=True)
         "title": "A concise 5-8 word summary of the issue (required)",
         "description": "A short paragraph explaining the problem and any details the customer gave (required)",
         "customer_id": "The customer's phone number, email, or UUID (required)",
-        "priority": "The priority of the ticket (low, medium, high). Use the logic in the system prompt."
+        "priority": "The priority of the ticket (low, medium, high). Use the logic in the system prompt.",
+        "context": "Optional: The relevant knowledge base context reference to assist with ticket creation"
     },
     return_direct=False
 )
-def create_ticket(title: str, description: str, customer_id: str, priority: str = "medium") -> str:
+def create_ticket(title: str, description: str, customer_id: str, priority: str = "medium", context: str = "") -> str:
     try:
         with Session(engine) as session:
             max_ticket_number = session.exec(
@@ -50,7 +51,8 @@ def create_ticket(title: str, description: str, customer_id: str, priority: str 
                 description=description,
                 customer_id=customer_id,
                 priority=priority.lower(),
-                ticket_number=next_ticket_number
+                ticket_number=next_ticket_number,
+                agent_context=context
             )
             session.add(ticket)
             session.commit()

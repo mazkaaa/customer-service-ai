@@ -11,6 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, SecretStr
 from sqlmodel import SQLModel, create_engine
 from dotenv import load_dotenv
+from langchain.schema import Document
 
 from agent import (
     create_session, complete_session,
@@ -99,6 +100,7 @@ class SessionAsk(BaseModel):
 
 class ProcessKnowledgeFile(BaseModel):
     file_name: str
+    add_to_vector_db: bool = True
 
 @app.on_event("startup")
 def startup_event():
@@ -119,8 +121,11 @@ async def start(payload: Ask):
 
     # AI should ask for customer_id if not present
     try:
+        retrieved_docs = vectorstore.similarity_search(payload.question, k=3)
+        context = "\n\n".join([doc.page_content for doc in retrieved_docs])
         response = agent_executor.invoke({
             "input": payload.question,
+            "context": context,
             "chat_history": [],
             "customer_id": None,
             "session_id": session_id
@@ -161,8 +166,11 @@ async def chat(payload: SessionAsk):
         )
 
     try:
+        retrieved_docs = vectorstore.similarity_search(payload.question, k=3)
+        context = "\n\n".join([doc.page_content for doc in retrieved_docs])
         response = agent_executor.invoke({
             "input": payload.question,
+            "context": context,
             "chat_history": history,
             "session_id": payload.session_id
         })
@@ -260,6 +268,18 @@ async def process_knowledge_by_name(
         )
     
     try:
+        # If payload.add_to_vector_db is False, remove from vector DB and return
+        if not payload.add_to_vector_db:
+            vectorstore.delete(
+                where={
+                    "document_name": payload.file_name
+                }
+            )
+            return {
+                "filename": payload.file_name,
+                "message": "File {payload.filename} removed from knowledge base."
+            }
+
         loader = PyPDFLoader(file_path)
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
@@ -268,7 +288,16 @@ async def process_knowledge_by_name(
         docs = loader.load()
         all_splits = text_splitter.split_documents(docs)
 
-        vectorstore.add_documents(all_splits)
+        documents = [
+            Document(
+                page_content=chunk.page_content,
+                metadata={"document_name": payload.file_name}
+            ) for chunk in all_splits
+        ]
+
+        vectorstore.add_documents(
+            documents=documents
+        )
 
         return {
             "filename": payload.file_name,
@@ -295,14 +324,19 @@ async def get_knowledge_list_files():
             file_path = os.path.join(UPLOAD_DIR, filename)
             if os.path.isfile(file_path):
                 size = os.path.getsize(file_path)
-                is_processed = len(vectorstore.similarity_search(filename, k=1)) > 0
+                metadatas = vectorstore.get(
+                    where={
+                        "document_name": filename
+                    }
+                ).get("metadatas")
+                is_in_vectorstore = bool(metadatas) and len(metadatas) > 0
                 files.append({
                     "filename": filename,
                     "extension": os.path.splitext(filename)[1],
-                    "is_processed": is_processed,
+                    "is_processed": is_in_vectorstore,
                     "upload_date": os.path.getctime(file_path),
                     "size_bytes": size,
-                    "chunks_in_vector_db": len(vectorstore.similarity_search(filename, k=1000)) if is_processed else 0
+                    "chunks_in_vector_db": len(vectorstore.similarity_search(filename, k=1000)) if is_in_vectorstore else 0
                 })
         return {"files": files}
     except FileNotFoundError:
@@ -328,10 +362,13 @@ async def delete_knowledge_file(file_name: str):
     
     try:
         # Remove from vectorstore
-        vectorstore.delete(
-            ids=[file_name],
-        )
-        
+        if vectorstore.get(where={"document_name": file_name}).get("metadatas"):
+            vectorstore.delete(
+                where={
+                    "document_name": file_name
+                }
+            )
+
         # Remove the original file
         os.remove(file_path)
 

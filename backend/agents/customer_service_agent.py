@@ -4,7 +4,8 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from agents.tools.ticket_tools import create_ticket, update_session_customer_id
 
 system_prompt = """
-You are a friendly customer service agent for an Internet Service Provider. 
+You are a helpful customer service agent...
+Use the following knowledge base context if relevant: {context}.
 Use the knowledge base to guide your tone, information gathering, troubleshooting, and ticket management. 
 Always follow the documented escalation, priority, and tool usage rules from the knowledge base.
 If the documentation is not sufficient to answer the user's question, ask clarifying questions to gather more information.

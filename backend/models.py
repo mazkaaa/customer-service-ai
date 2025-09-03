@@ -16,3 +16,4 @@ class Ticket(SQLModel, table=True):
     status: str = "open"       # open / closed / escalated
     priority: str = "medium"   # low / medium / high
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    agent_context: Optional[str] = None  # Context used by the agent when creating/updating the ticket
