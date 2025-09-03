@@ -77,7 +77,10 @@ function RouteComponent() {
 	});
 
 	const processFileMutation = useMutation({
-		mutationFn: async (payload: { file_name: string }) => {
+		mutationFn: async (payload: {
+			file_name: string;
+			add_to_vector_db: boolean;
+		}) => {
 			const response = await fetch("http://localhost:8000/knowledge", {
 				method: "PUT",
 				headers: {
@@ -85,6 +88,7 @@ function RouteComponent() {
 				},
 				body: JSON.stringify({
 					file_name: payload.file_name,
+					add_to_vector_db: payload.add_to_vector_db,
 				}),
 			});
 			const result = await response.json();
@@ -95,7 +99,7 @@ function RouteComponent() {
 		},
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["knowledge-files"] });
-			toast.success("File added to vector database successfully");
+			toast.success("File added to the agent knowledge successfully");
 		},
 		onError: () => {
 			toast.error("Error processing file");
@@ -130,7 +134,7 @@ function RouteComponent() {
 			},
 			{
 				accessorKey: "is_processed",
-				header: "Processed",
+				header: "Agent Knowledge",
 				cell: ({ getValue }) =>
 					getValue() ? <Badge>Yes</Badge> : <Badge variant="outline">No</Badge>,
 			},
@@ -157,11 +161,14 @@ function RouteComponent() {
 							<Button
 								size="icon"
 								disabled={
-									processFileMutation.isPending || row.original.is_processed
+									processFileMutation.isPending || deleteFileMutation.isPending
 								}
-								variant={row.original.is_processed ? "secondary" : "default"}
+								variant={row.original.is_processed ? "outline" : "default"}
 								onClick={() =>
-									processFileMutation.mutate({ file_name: filename })
+									processFileMutation.mutate({
+										file_name: filename,
+										add_to_vector_db: !row.original.is_processed,
+									})
 								}
 							>
 								{processFileMutation.isPending ? (
@@ -177,7 +184,10 @@ function RouteComponent() {
 									deleteFileMutation.mutate({ filename });
 								}}
 								size={"icon"}
-								variant={"outline"}
+								variant={"destructive"}
+								disabled={
+									processFileMutation.isPending || deleteFileMutation.isPending
+								}
 							>
 								{deleteFileMutation.isPending ? (
 									<Loader2Icon className="animate-spin" />
@@ -195,15 +205,8 @@ function RouteComponent() {
 
 	return (
 		<main className="flex flex-1 flex-col py-4 md:py-6 px-4 lg:px-6 @container/main">
-			<div className="grid grid-cols-2 gap-4">
-				<section>
-					<DataTable
-						columns={column}
-						data={knowledgeFilesQuery.data?.files ?? []}
-						isLoading={knowledgeFilesQuery.isLoading}
-					/>
-				</section>
-				<section>
+			<div className="grid grid-cols-4 gap-4">
+				<section className="col-span-1">
 					<div className="border rounded-lg h-80 flex flex-col justify-center items-center text-center gap-4 p-4">
 						<div className="gap-4 flex flex-col">
 							<div className="max-w-xs gap-2 flex flex-col">
@@ -259,6 +262,13 @@ function RouteComponent() {
 							/>
 						</div>
 					</div>
+				</section>
+				<section className="col-span-3">
+					<DataTable
+						columns={column}
+						data={knowledgeFilesQuery.data?.files ?? []}
+						isLoading={knowledgeFilesQuery.isLoading}
+					/>
 				</section>
 			</div>
 		</main>
