@@ -42,15 +42,18 @@ def get_active_session(customer_id: str) -> Optional[str]:
             return session_id
     return None
 
-def complete_session(session_id: str, ticket_id: Optional[str] = None):
-    """Mark a session as completed."""
-    updates = {"status": "completed", "completed_at": datetime.utcnow().isoformat()}
-    if ticket_id:
-        updates["ticket_id"] = str(ticket_id)
-    r.hset(f"session:{session_id}", mapping=updates)
-    # Keep completed session for 24 hours
-    r.expire(f"session:{session_id}", 86400)
-    r.expire(f"chat_session:{session_id}", 86400)
+def complete_session(session_id: str, ticket_id: Optional[str] = None) -> bool:
+    """Mark a session as completed (delete the session after marking it completed)."""
+    try:
+        # Check if session exists before attempting to delete
+        if r.exists(f"session:{session_id}") == 0:
+            return False  # Session doesn't exist
+        
+        r.delete(f"chat_session:{session_id}")  # Remove chat history after completion
+        r.delete(f"session:{session_id}")  # Remove session data
+        return True  # Successfully deleted
+    except Exception:
+        return False  # Failed to delete
 
 def get_session_history(session_id: str) -> List[Dict]:
     """Get chat history for a specific session."""
@@ -60,9 +63,8 @@ def get_session_history(session_id: str) -> List[Dict]:
     return [json.loads(m) for m in reversed(data)]
 
 def is_session_completed(session_id: str) -> bool:
-    """Check if a session is completed."""
-    session_data = cast(Dict[str, str], r.hgetall(f"session:{session_id}"))
-    return session_data.get("status") == "completed" if session_data else False
+    """Check if a session is completed (doesn't exist in redis)."""
+    return r.exists(f"session:{session_id}") == 0
 
 def add_session_turn(session_id: str, role: str, content: str):
     """Add a message to a session."""

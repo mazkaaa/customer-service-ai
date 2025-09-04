@@ -6,6 +6,7 @@ import redis
 from sqlmodel import Session, create_engine, desc, select
 from models import Ticket
 from langchain_core.tools import tool, ToolException
+from typing import Optional
 
 # Load environment variables from .env file
 load_dotenv()
@@ -99,3 +100,27 @@ def update_session_customer_id(session_id: str, customer_id: str):
     """Update the customer_id for a session and add to customer_sessions index."""
     r.hset(f"session:{session_id}", "customer_id", customer_id)
     r.lpush(f"customer_sessions:{customer_id}", session_id)
+
+@tool(
+    name_or_callable="end_session",
+    description=(
+        "MUST BE USED IMMEDIATELY IF THE CONVERSATION IS ENDING."
+        "MUST be used to mark the current session as completed when the interaction is done. "
+        "Do NOT assume the session is completed—always call this tool to finalize the session. "
+        "This ensures proper session management and data integrity."
+    ),
+    args_schema={
+        "session_id": "The session ID to complete (required)",
+        "ticket_id": "Optional: The ticket ID associated with the session"
+    },
+    return_direct=False,
+)
+def end_session(session_id: str, ticket_id: Optional[str] = None) -> str:
+    """Mark a session as completed."""
+    from chat import complete_session  # Avoid circular import
+    success = complete_session(session_id, ticket_id)
+    
+    if success:
+        return f"Session {session_id} completed successfully."
+    else:
+        return f"Failed to complete session {session_id} - session may not exist or deletion failed."

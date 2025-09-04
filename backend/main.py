@@ -21,7 +21,7 @@ from agent import (
 from langchain_core.exceptions import OutputParserException
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings
 
 from api.ticket_api import list_tickets
 from chat import is_session_completed
@@ -31,7 +31,7 @@ from chat import is_session_completed
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "moonshotai/kimi-k2:free")
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "nvidia/nv-embedqa-mistral-7b-v2")
 EMBEDDING_URL = os.getenv("EMBEDDING_URL")
@@ -39,8 +39,8 @@ EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
-if not OPENROUTER_API_KEY:
-    raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+if not NVIDIA_API_KEY:
+    raise ValueError("NVIDIA_API_KEY environment variable is not set")
 if not EMBEDDING_API_KEY:
     raise ValueError("EMBEDDING_API_KEY environment variable is not set")
 if not EMBEDDING_URL:
@@ -65,16 +65,11 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Instantiate the customer service agent from the registry
-llm = ChatOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=SecretStr(OPENROUTER_API_KEY),
-    model=MODEL_NAME,
-    temperature=0.2,
-    default_headers={
-        "HTTP-Referer": "localhost:3000",
-        "X-Title": "Customer Service AI",
-    },
-    max_retries=3,
+llm = ChatNVIDIA(
+    model="moonshotai/kimi-k2-instruct",
+    api_key=SecretStr(NVIDIA_API_KEY),
+    temperature=0.6,
+    top_p=0.9,
 )
 agent_executor = AGENT_REGISTRY["customer_service"](llm)
 
@@ -168,6 +163,10 @@ async def chat(payload: SessionAsk):
     try:
         retrieved_docs = vectorstore.similarity_search(payload.question, k=3)
         context = "\n\n".join([doc.page_content for doc in retrieved_docs])
+
+        # Add user turn before agent processing
+        add_session_turn(payload.session_id, "user", payload.question)
+        
         response = agent_executor.invoke({
             "input": payload.question,
             "context": context,
@@ -175,22 +174,17 @@ async def chat(payload: SessionAsk):
             "session_id": payload.session_id
         })
 
-        add_session_turn(payload.session_id, "user", payload.question)
+        # Check if session was completed by the agent (via end_session tool)
+        if is_session_completed(payload.session_id):
+            return {
+                "output": response["output"],
+                "session_id": payload.session_id,
+                "session_completed": True,
+            }
+        
+        # Session is still active, add assistant turn
         add_session_turn(payload.session_id, "assistant", response["output"])
-
-        # TODO: Check if ticket was created using redis session check (add ticket_id to session on creation)
-        if "#" in response["output"]:
-            ticket_match = re.search(r"#([\w-]+)", response["output"], re.IGNORECASE)
-            if ticket_match:
-                ticket_id = ticket_match.group(1)
-                complete_session(payload.session_id, ticket_id)
-                return {
-                    "output": response["output"],
-                    "session_id": payload.session_id,
-                    "session_completed": True,
-                    "ticket_id": ticket_id
-                }
-
+        
         return {
             "output": response["output"],
             "session_id": payload.session_id,

@@ -2,7 +2,7 @@ from chat import (
     create_session, get_active_session, complete_session,
     get_session_history, add_session_turn
 )
-from agents.tools.ticket_tools import create_ticket, list_tickets, update_session_customer_id
+from agents.tools.ticket_tools import create_ticket, list_tickets, update_session_customer_id, end_session
 from langchain_openai import ChatOpenAI
 from agents.customer_service_agent import get_customer_service_agent
 
@@ -14,6 +14,6 @@ AGENT_REGISTRY = {
 __all__ = [
     "create_session", "get_active_session", "complete_session",
     "get_session_history", "add_session_turn",
-    "create_ticket", "list_tickets", "update_session_customer_id",
+    "create_ticket", "list_tickets", "update_session_customer_id", "end_session",
     "ChatOpenAI", "AGENT_REGISTRY"
 ]

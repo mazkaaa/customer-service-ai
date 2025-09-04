@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from agents.tools.ticket_tools import create_ticket, update_session_customer_id
+from agents.tools.ticket_tools import create_ticket, end_session, update_session_customer_id
 
 system_prompt = """
 You are a helpful customer service agent...
@@ -19,7 +19,7 @@ prompt = ChatPromptTemplate.from_messages([
     MessagesPlaceholder(variable_name="agent_scratchpad"),
 ])
 
-tools = [create_ticket, update_session_customer_id]
+tools = [create_ticket, update_session_customer_id, end_session]
 
 def get_customer_service_agent(llm, **kwargs):
     agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
