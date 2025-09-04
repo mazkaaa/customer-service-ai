@@ -54,7 +54,7 @@ function App() {
 
   const startChatMutation = useMutation({
     mutationFn: async (payload: { question: string }) => {
-      const response = await fetch("http://localhost:8000/start", {
+      const response = await fetch(import.meta.env.VITE_API_URL + "/start", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -70,7 +70,7 @@ function App() {
     },
     onSuccess: (data) => {
       addMessageToConversation({
-        id: crypto.randomUUID(),
+        id: new Date().toISOString() + "-assistant",
         from: "assistant",
         output: data.output,
         session_completed: false,
@@ -78,7 +78,7 @@ function App() {
     },
     onError: (error: IErrorResponse) => {
       addMessageToConversation({
-        id: crypto.randomUUID(),
+        id: new Date().toISOString() + "-assistant",
         from: "assistant",
         output: error.detail.output,
         session_completed: error.detail.session_completed,
@@ -91,7 +91,7 @@ function App() {
 
   const continueChatMutation = useMutation({
     mutationFn: async (payload: { question: string; session_id: string }) => {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch(import.meta.env.VITE_API_URL + "/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -109,7 +109,7 @@ function App() {
     },
     onSuccess: (data) => {
       addMessageToConversation({
-        id: crypto.randomUUID(),
+        id: new Date().toISOString() + "-assistant",
         from: "assistant",
         output: data.output,
         session_completed: data.session_completed,
@@ -117,7 +117,7 @@ function App() {
     },
     onError: (error: IErrorResponse) => {
       addMessageToConversation({
-        id: crypto.randomUUID(),
+        id: new Date().toISOString() + "-assistant",
         from: "assistant",
         output: error.detail.output,
         session_completed: error.detail.session_completed,
@@ -210,7 +210,7 @@ function App() {
             }
             onSubmit={(message) => {
               addMessageToConversation({
-                id: crypto.randomUUID(),
+                id: new Date().toISOString() + "-user",
                 from: "user",
                 output: message,
                 session_completed: false,
